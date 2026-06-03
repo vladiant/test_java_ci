@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: temurin
+          cache: gradle
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build release artifact
+        run: ./gradlew -PprojectVersion=${{ steps.version.outputs.VERSION }} check assemble
+
+      - name: Rename JAR to include version tag
+        run: |
+          mv build/libs/java-ci-example-${{ steps.version.outputs.VERSION }}.jar \
+             build/libs/java-ci-example-${{ github.ref_name }}.jar
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ github.ref_name }}
+          body: |
+            ## Changes in ${{ github.ref_name }}
+
+            See [CHANGELOG](CHANGELOG.md) for details.
+          files: |
+            build/libs/java-ci-example-${{ github.ref_name }}.jar
+          generate_release_notes: true
+          fail_on_unmatched_files: true

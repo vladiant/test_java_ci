@@ -1,0 +1,178 @@
+# GitLab CI/CD Pipeline
+#
+# Stages:
+#   validate  – code style (Checkstyle)
+#   build     – compile and assemble the fat JAR
+#   test      – JUnit 5 tests + JaCoCo coverage enforcement
+#   analyze   – static analysis (SpotBugs) and dependency scanning
+#   release   – publish a versioned artifact on tag pipelines
+
+stages:
+  - validate
+  - build
+  - test
+  - analyze
+  - release
+
+# GitLab-managed security scanning templates (SAST + Dependency Scanning)
+include:
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Dependency-Scanning.gitlab-ci.yml
+
+# ── Default settings ─────────────────────────────────────────────────────────
+
+default:
+  image: eclipse-temurin:21-jdk
+  # Cache the Gradle user home between jobs on the same runner
+  cache:
+    key:
+      files:
+        - gradle/wrapper/gradle-wrapper.properties
+        - build.gradle.kts
+    paths:
+      - .gradle/wrapper/
+      - .gradle/caches/
+
+# Reusable before_script: make the wrapper executable
+.gradle_before: &gradle_before
+  before_script:
+    - chmod +x ./gradlew
+
+# ── Validate ──────────────────────────────────────────────────────────────────
+
+checkstyle:
+  stage: validate
+  <<: *gradle_before
+  script:
+    - ./gradlew checkstyleMain checkstyleTest
+  artifacts:
+    when: always
+    paths:
+      - build/reports/checkstyle/
+    expire_in: 7 days
+
+# ── Build ─────────────────────────────────────────────────────────────────────
+
+# Build matrix: Java 21 (primary) and Java 23
+.build_template:
+  stage: build
+  <<: *gradle_before
+  script:
+    - ./gradlew assemble -x test
+  artifacts:
+    paths:
+      - build/libs/*.jar
+    expire_in: 7 days
+
+build:java21:
+  extends: .build_template
+  image: eclipse-temurin:21-jdk
+
+build:java23:
+  extends: .build_template
+  image: eclipse-temurin:23-jdk
+
+# ── Test ──────────────────────────────────────────────────────────────────────
+
+.test_template:
+  stage: test
+  <<: *gradle_before
+  script:
+    - ./gradlew test jacocoTestReport jacocoTestCoverageVerification
+  artifacts:
+    when: always
+    reports:
+      junit: build/test-results/test/*.xml
+    paths:
+      - build/reports/tests/test/
+      - build/reports/jacoco/
+    expire_in: 7 days
+
+test:java21:
+  extends: .test_template
+  image: eclipse-temurin:21-jdk
+  coverage: '/Total.*?([0-9]{1,3})%/'
+  after_script:
+    # Print the coverage summary line for GitLab to pick up via the regex above
+    - cat build/reports/jacoco/test/html/index.html | grep -o 'Total[^%]*%' | tail -1 || true
+
+test:java23:
+  extends: .test_template
+  image: eclipse-temurin:23-jdk
+
+# ── Analyze ───────────────────────────────────────────────────────────────────
+
+spotbugs:
+  stage: analyze
+  image: eclipse-temurin:21-jdk
+  <<: *gradle_before
+  script:
+    - ./gradlew spotbugsMain spotbugsTest
+  artifacts:
+    when: always
+    paths:
+      - build/reports/spotbugs/
+    expire_in: 7 days
+
+# GitLab Dependency Scanning (requires GitLab Ultimate or free for public projects)
+dependency_scanning:
+  stage: analyze
+  image: eclipse-temurin:21-jdk
+  <<: *gradle_before
+  script:
+    # Generate a dependency report; actual vulnerability DB scanning is done
+    # by the GitLab Dependency Scanning template below when available.
+    - ./gradlew dependencies --configuration runtimeClasspath > build/dependency-tree.txt
+  artifacts:
+    paths:
+      - build/dependency-tree.txt
+    expire_in: 7 days
+
+# GitLab SAST (static application security testing) – uses built-in analyzers.
+# Works on GitLab.com (free tier for public repos) and self-hosted EE.
+# The templates are included at the top-level via the `include:` key below.
+sast:
+  stage: analyze
+  variables:
+    SAST_EXCLUDED_PATHS: "build, .gradle"
+  inherit:
+    default: false
+
+# ── Release ───────────────────────────────────────────────────────────────────
+
+release:
+  stage: release
+  image: eclipse-temurin:21-jdk
+  <<: *gradle_before
+  rules:
+    # Run only when a version tag is pushed (e.g. v1.2.3)
+    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
+  script:
+    - VERSION="${CI_COMMIT_TAG#v}"
+    - ./gradlew -PprojectVersion="$VERSION" check assemble
+    - mv build/libs/java-ci-example-${VERSION}.jar build/libs/java-ci-example-${CI_COMMIT_TAG}.jar
+  artifacts:
+    name: "java-ci-example-${CI_COMMIT_TAG}"
+    paths:
+      - build/libs/java-ci-example-${CI_COMMIT_TAG}.jar
+    expire_in: 90 days
+
+# Create a GitLab Release entry pointing at the job artifact
+release_page:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
+  needs:
+    - job: release
+      artifacts: true
+  script:
+    - echo "Creating GitLab Release for ${CI_COMMIT_TAG}"
+  release:
+    name: "Release ${CI_COMMIT_TAG}"
+    description: "Automated release for ${CI_COMMIT_TAG}"
+    tag_name: "${CI_COMMIT_TAG}"
+    assets:
+      links:
+        - name: "java-ci-example-${CI_COMMIT_TAG}.jar"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/build/libs/java-ci-example-${CI_COMMIT_TAG}.jar?job=release"

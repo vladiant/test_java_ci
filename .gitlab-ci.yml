@@ -57,8 +57,10 @@ checkstyle:
 .build_template:
   stage: build
   <<: *gradle_before
+  variables:
+    JAVA_TOOLCHAIN_VERSION: "21"
   script:
-    - ./gradlew assemble -x test
+    - ./gradlew assemble -x test -PjavaToolchainVersion=${JAVA_TOOLCHAIN_VERSION}
   artifacts:
     paths:
       - build/libs/*.jar
@@ -71,14 +73,18 @@ build:java21:
 build:java23:
   extends: .build_template
   image: eclipse-temurin:23-jdk
+  variables:
+    JAVA_TOOLCHAIN_VERSION: "23"
 
 # ── Test ──────────────────────────────────────────────────────────────────────
 
 .test_template:
   stage: test
   <<: *gradle_before
+  variables:
+    JAVA_TOOLCHAIN_VERSION: "21"
   script:
-    - ./gradlew test jacocoTestReport jacocoTestCoverageVerification
+    - ./gradlew test jacocoTestReport jacocoTestCoverageVerification -PjavaToolchainVersion=${JAVA_TOOLCHAIN_VERSION}
   artifacts:
     when: always
     reports:
@@ -99,6 +105,8 @@ test:java21:
 test:java23:
   extends: .test_template
   image: eclipse-temurin:23-jdk
+  variables:
+    JAVA_TOOLCHAIN_VERSION: "23"
 
 # ── Analyze ───────────────────────────────────────────────────────────────────
 

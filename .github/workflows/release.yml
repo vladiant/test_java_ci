@@ -40,7 +40,7 @@ jobs:
              build/libs/java-ci-example-${{ github.ref_name }}.jar
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: Release ${{ github.ref_name }}
           body: |

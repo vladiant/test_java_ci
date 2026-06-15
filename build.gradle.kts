@@ -11,9 +11,11 @@ plugins {
 group = "com.example"
 version = project.findProperty("projectVersion") as String? ?: "1.0.0"
 
+val javaToolchainVersion = (project.findProperty("javaToolchainVersion") as String?)?.toInt() ?: 21
+
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(javaToolchainVersion)
     }
 }
 

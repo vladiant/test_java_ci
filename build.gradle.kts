@@ -11,9 +11,11 @@ plugins {
 group = "com.example"
 version = project.findProperty("projectVersion") as String? ?: "1.0.0"
 
+val javaToolchainVersion = (project.findProperty("javaToolchainVersion") as String?)?.toInt() ?: 21
+
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(javaToolchainVersion)
     }
 }
 
@@ -22,7 +24,7 @@ repositories {
 }
 
 dependencies {
-    testImplementation("org.junit.jupiter:junit-jupiter:5.10.3")
+    testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

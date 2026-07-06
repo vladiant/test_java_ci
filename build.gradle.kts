@@ -5,7 +5,7 @@ plugins {
     jacoco
     checkstyle
     id("com.github.spotbugs") version "6.5.8"
-    id("com.gradleup.shadow") version "9.4.3"
+    id("com.gradleup.shadow") version "9.5.0"
 }
 
 group = "com.example"
@@ -13,10 +13,8 @@ version = project.findProperty("projectVersion") as String? ?: "1.0.0"
 
 val javaToolchainVersion = (project.findProperty("javaToolchainVersion") as String?)?.toInt() ?: 21
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(javaToolchainVersion)
-    }
+tasks.withType<JavaCompile>().configureEach {
+    options.release.set(javaToolchainVersion)
 }
 
 repositories {

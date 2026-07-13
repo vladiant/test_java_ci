@@ -5,7 +5,7 @@ plugins {
     jacoco
     checkstyle
     id("com.github.spotbugs") version "6.5.8"
-    id("com.gradleup.shadow") version "9.5.0"
+    id("com.gradleup.shadow") version "9.5.1"
 }
 
 group = "com.example"

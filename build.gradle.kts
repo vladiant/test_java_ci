@@ -4,7 +4,7 @@ plugins {
     java
     jacoco
     checkstyle
-    id("com.github.spotbugs") version "6.5.9"
+    id("com.github.spotbugs") version "6.5.12"
     id("com.gradleup.shadow") version "9.6.1"
 }
 
@@ -22,7 +22,7 @@ repositories {
 }
 
 dependencies {
-    testImplementation("org.junit.jupiter:junit-jupiter:6.1.2")
+    testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

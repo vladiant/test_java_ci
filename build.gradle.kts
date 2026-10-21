@@ -4,7 +4,7 @@ plugins {
     java
     jacoco
     checkstyle
-    id("com.github.spotbugs") version "6.5.12"
+    id("com.github.spotbugs") version "6.5.13"
     id("com.gradleup.shadow") version "9.6.1"
 }
 
